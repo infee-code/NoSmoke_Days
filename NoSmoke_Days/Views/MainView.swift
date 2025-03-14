@@ -19,7 +19,7 @@ struct MainView: View {
             }
             .padding()
         }
-        .navigationTitle("无烟生活")
+        .navigationTitle("清息")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -74,23 +74,35 @@ struct MainView: View {
     
     // 进度视图
     private var progressView: some View {
-        VStack(spacing: 15) {
+        VStack(alignment: .leading, spacing: 15) {
             Text("戒烟进度")
                 .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .leading)
             
             let milestones = [1, 7, 30, 90, 180, 365]
-            let nextMilestone = milestones.first { $0 > quitData.daysSinceQuit } ?? milestones.last!
-            let progress = min(1.0, Double(quitData.daysSinceQuit) / Double(nextMilestone))
+            let days = quitData.daysSinceQuit
+            let (progress, nextMilestoneText) = calculateProgress(days: days, milestones: milestones)
             
-            ProgressView(value: progress)
-                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
-                .scaleEffect(x: 1, y: 2, anchor: .center)
-            
-            Text("下一个里程碑：\(nextMilestone)天")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+            VStack(alignment: .leading, spacing: 8) {
+                ProgressView(value: progress)
+                    .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                    .scaleEffect(x: 1, y: 3, anchor: .center)
+                
+                HStack {
+                    if days >= 365 {
+                        let years = Double(days) / 365.0
+                        Text(String(format: "已坚持 %.1f 年", years))
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.blue)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(nextMilestoneText)
+                        .font(.system(size: 15))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.top, 4)
+            }
         }
         .padding()
         .background(
@@ -100,6 +112,19 @@ struct MainView: View {
         )
     }
     
+    private func calculateProgress(days: Int, milestones: [Int]) -> (progress: Double, nextMilestone: String) {
+        if days >= 365 {
+            let years = Double(days) / 365.0
+            let nextYear = ceil(years)
+            let progress = (years - floor(years)) / (nextYear - floor(years))
+            return (progress, "下一个里程碑：\(Int(nextYear))年")
+        } else {
+            let nextMilestone = milestones.first { $0 > days } ?? milestones.last!
+            let progress = min(1.0, Double(days) / Double(nextMilestone))
+            return (progress, "下一个里程碑：\(nextMilestone)天")
+        }
+    }
+    
     // 打卡视图
     private var checkInView: some View {
         VStack(spacing: 15) {
@@ -107,30 +132,34 @@ struct MainView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
-            if quitData.hasCheckedInToday {
+            VStack(spacing: 10) {
                 HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .font(.title)
+                    Image(systemName: quitData.hasCheckedInToday ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 28))
+                        .foregroundColor(quitData.hasCheckedInToday ? .green : .white)
+                        .animation(.spring(response: 0.3), value: quitData.hasCheckedInToday)
                     
-                    Text("今日已打卡")
-                        .font(.title3)
-                        .foregroundColor(.green)
+                    Text(quitData.hasCheckedInToday ? "今日已打卡" : "点击打卡")
+                        .font(.system(size: 20))
+                        .foregroundColor(quitData.hasCheckedInToday ? .green : .white)
+                        .animation(.spring(response: 0.3), value: quitData.hasCheckedInToday)
                 }
-                .padding()
-            } else {
-                Button(action: {
-                    quitData.checkIn()
-                }) {
-                    Text("点击打卡")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue)
-                        .cornerRadius(10)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if !quitData.hasCheckedInToday {
+                        withAnimation(.spring(response: 0.3)) {
+                            quitData.checkIn()
+                        }
+                    }
                 }
             }
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(quitData.hasCheckedInToday ? Color.green.opacity(0.15) : Color.blue)
+                    .animation(.spring(response: 0.3), value: quitData.hasCheckedInToday)
+            )
             
             Text("已连续打卡\(quitData.checkInDates.count)天")
                 .font(.subheadline)
@@ -146,38 +175,43 @@ struct MainView: View {
     
     // 统计视图
     private var statisticsView: some View {
-        VStack(spacing: 15) {
+        VStack(alignment: .leading, spacing: 20) {
             Text("健康改善")
                 .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 5)
             
             let days = quitData.daysSinceQuit
             
-            if days >= 1 {
-                healthBenefitRow(icon: "heart.fill", color: .red, text: "血压和心率恢复正常")
+            VStack(alignment: .leading, spacing: 16) {
+                if days >= 1 {
+                    healthBenefitRow(icon: "heart.fill", color: .red, text: "血压和心率恢复正常")
+                }
+                
+                if days >= 2 {
+                    healthBenefitRow(icon: "nose.fill", color: .orange, text: "嗅觉和味觉开始恢复")
+                }
+                
+                if days >= 14 {
+                    healthBenefitRow(icon: "lungs.fill", color: .blue, text: "肺功能开始改善")
+                }
+                
+                if days >= 30 {
+                    healthBenefitRow(icon: "figure.walk", color: .green, text: "呼吸困难减轻，精力增加")
+                }
+                
+                if days < 1 {
+                    Text("继续坚持，健康改善即将开始！")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                }
             }
-            
-            if days >= 2 {
-                healthBenefitRow(icon: "nose.fill", color: .orange, text: "嗅觉和味觉开始恢复")
-            }
-            
-            if days >= 14 {
-                healthBenefitRow(icon: "lungs.fill", color: .blue, text: "肺功能开始改善")
-            }
-            
-            if days >= 30 {
-                healthBenefitRow(icon: "figure.walk", color: .green, text: "呼吸困难减轻，精力增加")
-            }
-            
-            if days < 1 {
-                Text("继续坚持，健康改善即将开始！")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding()
-            }
+            .padding(.horizontal, 10)
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 15)
                 .fill(Color(.systemBackground))
@@ -186,18 +220,20 @@ struct MainView: View {
     }
     
     private func healthBenefitRow(icon: String, color: Color, text: String) -> some View {
-        HStack(spacing: 15) {
+        HStack(spacing: 12) {
             Image(systemName: icon)
                 .foregroundColor(color)
-                .font(.title3)
+                .font(.title2)
+                .frame(width: 24, alignment: .center)
+                .accessibility(hidden: true)
             
             Text(text)
-                .font(.subheadline)
+                .font(.system(size: 16))
                 .foregroundColor(.primary)
+                .padding(.vertical, 4)
             
             Spacer()
         }
-        .padding(.vertical, 5)
     }
 }
 
