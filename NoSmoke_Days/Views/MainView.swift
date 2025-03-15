@@ -3,7 +3,7 @@ import SwiftUI
 struct MainView: View {
     @ObservedObject var quitData: QuitSmokingData
     @State private var showingResetAlert = false
-    @State private var showingDatePicker = false
+    @State private var showingSetupView = false
     @State private var selectedNewDate = Date()
     
     var body: some View {
@@ -24,6 +24,7 @@ struct MainView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
+                    generateHapticFeedback(style: .medium)
                     showingResetAlert = true
                 }) {
                     Image(systemName: "arrow.counterclockwise.circle")
@@ -32,15 +33,18 @@ struct MainView: View {
             }
         }
         .alert("重新开始", isPresented: $showingResetAlert) {
-            Button("取消", role: .cancel) { }
+            Button("取消", role: .cancel) {
+                generateHapticFeedback(style: .light)
+            }
             Button("确定", role: .destructive) {
-                showingDatePicker = true
+                generateHapticFeedback(style: .heavy)
+                showingSetupView = true
             }
         } message: {
             Text("确定要重新开始戒烟计时吗？这将清除所有记录。")
         }
-        .sheet(isPresented: $showingDatePicker) {
-            CustomDatePickerView(selectedDate: $selectedNewDate, quitData: quitData)
+        .sheet(isPresented: $showingSetupView) {
+            SetupView(quitData: quitData, isSetupComplete: $showingSetupView)
         }
     }
     
@@ -147,6 +151,7 @@ struct MainView: View {
                 .contentShape(Rectangle())
                 .onTapGesture {
                     if !quitData.hasCheckedInToday {
+                        generateHapticFeedback(style: .rigid)
                         withAnimation(.spring(response: 0.3)) {
                             quitData.checkIn()
                         }
