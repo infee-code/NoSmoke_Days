@@ -3,10 +3,21 @@ import Foundation
 class QuitSmokingData: ObservableObject {
     @Published var quitDate: Date
     @Published var checkInDates: [Date] = []
+    private let userDefaults: UserDefaults
     
     init(quitDate: Date = Date()) {
         self.quitDate = quitDate
+        self.userDefaults = UserDefaults.standard
         loadCheckInDates()
+    }
+    
+    // 用于测试的初始化方法
+    init(quitDate: Date = Date(), loadSavedData: Bool = true, userDefaults: UserDefaults = .standard) {
+        self.quitDate = quitDate
+        self.userDefaults = userDefaults
+        if loadSavedData {
+            loadCheckInDates()
+        }
     }
     
     // 格式化日期为中文格式
@@ -72,13 +83,14 @@ class QuitSmokingData: ObservableObject {
     // 保存打卡记录
     private func saveCheckInDates() {
         if let encoded = try? JSONEncoder().encode(checkInDates) {
-            UserDefaults.standard.set(encoded, forKey: "checkInDates")
+            userDefaults.set(encoded, forKey: "checkInDates")
+            userDefaults.synchronize()
         }
     }
     
     // 加载打卡记录
     private func loadCheckInDates() {
-        if let savedDates = UserDefaults.standard.data(forKey: "checkInDates"),
+        if let savedDates = userDefaults.data(forKey: "checkInDates"),
            let decodedDates = try? JSONDecoder().decode([Date].self, from: savedDates) {
             checkInDates = decodedDates
         }
@@ -86,11 +98,17 @@ class QuitSmokingData: ObservableObject {
     
     // 保存戒烟日期
     private func saveQuitDate() {
-        UserDefaults.standard.set(quitDate, forKey: "quitDate")
+        let timestamp = quitDate.timeIntervalSince1970
+        userDefaults.set(timestamp, forKey: "quitDate")
+        userDefaults.synchronize()
     }
     
     // 加载戒烟日期
     func loadQuitDate() -> Date? {
-        return UserDefaults.standard.object(forKey: "quitDate") as? Date
+        let timestamp = userDefaults.double(forKey: "quitDate")
+        if timestamp > 0 {  // 确保时间戳是有效的
+            return Date(timeIntervalSince1970: timestamp)
+        }
+        return nil
     }
 } 
