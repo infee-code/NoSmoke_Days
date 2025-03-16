@@ -57,9 +57,71 @@ class QuitSmokingData: ObservableObject {
         }
     }
     
+    // 检查是否可以打卡
+    var canCheckIn: Bool {
+        // 如果今天已经打卡，则不能再次打卡
+        if hasCheckedInToday {
+            return false
+        }
+        
+        // 检查总戒烟时间是否大于24小时
+        let hoursSinceQuit = Date().timeIntervalSince(quitDate) / 3600
+        if hoursSinceQuit < 24 {
+            return false
+        }
+        
+        // 如果有打卡记录，检查距离上次打卡是否已经过了24小时
+        if let lastCheckInDate = checkInDates.last {
+            let hoursSinceLastCheckIn = Date().timeIntervalSince(lastCheckInDate) / 3600
+            return hoursSinceLastCheckIn >= 24
+        }
+        
+        // 如果没有打卡记录，且戒烟时间大于24小时，则可以打卡
+        return true
+    }
+    
+    // 获取下次可打卡时间
+    var nextCheckInTime: Date? {
+        // 如果可以打卡，返回nil
+        if canCheckIn {
+            return nil
+        }
+        
+        // 如果戒烟时间不足24小时，返回戒烟时间+24小时
+        let hoursSinceQuit = Date().timeIntervalSince(quitDate) / 3600
+        if hoursSinceQuit < 24 {
+            return quitDate.addingTimeInterval(24 * 3600)
+        }
+        
+        // 如果有打卡记录，返回上次打卡时间+24小时
+        if let lastCheckInDate = checkInDates.last {
+            let nextDate = lastCheckInDate.addingTimeInterval(24 * 3600)
+            
+            // 如果下次打卡时间在今天，但今天已经打卡，则返回明天相同时间
+            if hasCheckedInToday {
+                let calendar = Calendar.current
+                if calendar.isDateInToday(nextDate) {
+                    // 计算明天相同时间
+                    if let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()) {
+                        let todayComponents = calendar.dateComponents([.hour, .minute, .second], from: nextDate)
+                        let tomorrowDate = calendar.date(bySettingHour: todayComponents.hour ?? 0,
+                                                        minute: todayComponents.minute ?? 0,
+                                                        second: todayComponents.second ?? 0,
+                                                        of: tomorrow) ?? tomorrow
+                        return tomorrowDate
+                    }
+                }
+            }
+            
+            return nextDate
+        }
+        
+        return nil
+    }
+    
     // 执行打卡
     func checkIn() {
-        if !hasCheckedInToday {
+        if canCheckIn {
             let now = Date()
             checkInDates.append(now)
             saveCheckInDates()
@@ -111,4 +173,4 @@ class QuitSmokingData: ObservableObject {
         }
         return nil
     }
-} 
+}

@@ -4,6 +4,7 @@ struct SetupView: View {
     @ObservedObject var quitData: QuitSmokingData
     @Binding var isSetupComplete: Bool
     @State private var selectedDate = Date()
+    @State private var showFutureTimeAlert = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -70,9 +71,17 @@ struct SetupView: View {
                 VStack(spacing: 16) {
                     Button(action: {
                         generateHapticFeedback(style: .rigid)
-                        quitData.setInitialQuitDate(selectedDate)
-                        isSetupComplete = true
-                        dismiss()
+                        
+                        // 检查选择的时间是否在未来
+                        if selectedDate > Date() {
+                            // 显示提示，不允许设置未来时间
+                            showFutureTimeAlert = true
+                        } else {
+                            // 设置戒烟时间并关闭视图
+                            quitData.reset(withNewDate: selectedDate)
+                            isSetupComplete = true
+                            dismiss()
+                        }
                     }) {
                         Text("开始我的戒烟之旅")
                             .font(.headline)
@@ -96,6 +105,9 @@ struct SetupView: View {
             .contentShape(Rectangle())
             // 阻止 VStack 内部的点击事件传递到背景
             .onTapGesture { }
+        }
+        .alert(isPresented: $showFutureTimeAlert) {
+            Alert(title: Text("提示"), message: Text("请选择过去的时间"), dismissButton: .default(Text("确定")))
         }
     }
 } 
